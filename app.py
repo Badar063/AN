@@ -25,7 +25,8 @@ def load_data(results_path, history_path):
     try:
         results_df = pd.read_csv(results_path)
     except FileNotFoundError:
-        st.error(f"File not found: {results_path}. Please ensure it is in the same directory.")
+        # Crucial error handling for deployment
+        st.error(f"❌ Data file not found: {results_path}. Please ensure both CSV and JSON are uploaded alongside app.py.")
         return pd.DataFrame(), {}
     except Exception as e:
         st.error(f"Error loading {results_path}: {e}")
@@ -35,7 +36,7 @@ def load_data(results_path, history_path):
         with open(history_path, 'r') as f:
             history_data = json.load(f)
     except FileNotFoundError:
-        st.error(f"File not found: {history_path}. Please ensure it is in the same directory.")
+        st.error(f"❌ History file not found: {history_path}. Please ensure both CSV and JSON are uploaded alongside app.py.")
         return results_df, {}
     except Exception as e:
         st.error(f"Error loading {history_path}: {e}")
@@ -52,25 +53,26 @@ results_df, history_data = load_data(RESULTS_FILE, HISTORY_FILE)
 st.sidebar.title("Dashboard Controls")
 st.sidebar.markdown("Use the filters below to focus the analysis.")
 
-if not results_df.empty:
-    datasets = results_df['dataset_name'].unique()
-    selected_dataset = st.sidebar.selectbox("🎯 Select Dataset", datasets)
-
-    models = results_df['model_name'].unique()
-    selected_model = st.sidebar.selectbox("🧠 Select Model", models)
-    
-    # Filter DataFrame based on selection
-    filtered_df = results_df[results_df['dataset_name'] == selected_dataset]
-    focus_model_df = filtered_df[filtered_df['model_name'] == selected_model].iloc[0]
-
-    # Find the best models for KPIs
-    best_acc = filtered_df.loc[filtered_df['test_accuracy'].idxmax()]
-    best_f1 = filtered_df.loc[filtered_df['f1_score'].idxmax()]
-    fastest_inf = filtered_df.loc[filtered_df['inference_time'].idxmin()]
-else:
+if results_df.empty:
     st.title("Data Loading Error")
-    st.warning("Please ensure required files are uploaded and correct.")
+    st.warning("Please check the error message in the main content area above.")
     st.stop()
+    
+# Proceed only if data loaded successfully
+datasets = results_df['dataset_name'].unique()
+selected_dataset = st.sidebar.selectbox("🎯 Select Dataset", datasets)
+
+models = results_df['model_name'].unique()
+selected_model = st.sidebar.selectbox("🧠 Select Model", models)
+
+# Filter DataFrame based on selection
+filtered_df = results_df[results_df['dataset_name'] == selected_dataset]
+focus_model_df = filtered_df[filtered_df['model_name'] == selected_model].iloc[0]
+
+# Find the best models for KPIs
+best_acc = filtered_df.loc[filtered_df['test_accuracy'].idxmax()]
+best_f1 = filtered_df.loc[filtered_df['f1_score'].idxmax()]
+fastest_inf = filtered_df.loc[filtered_df['inference_time'].idxmin()]
 
 
 # =============================================================================
@@ -142,11 +144,6 @@ with comparison_col1:
 
 with comparison_col2:
     # Speed/Size Plot
-    metrics_df_2 = filtered_df[['model_name', 'inference_time', 'model_size_mb']].melt(
-        id_vars='model_name',
-        var_name='Metric',
-        value_name='Value'
-    )
     
     # Dual-axis chart for Speed vs Size (advanced visualization)
     fig_speed_size = px.bar(
@@ -154,7 +151,9 @@ with comparison_col2:
         x='model_name',
         y='inference_time',
         title='Inference Time & Model Size',
-        color_discrete_sequence=[MAIN_COLOR]
+        color_discrete_sequence=[MAIN_COLOR],
+        opacity=0.6,
+        labels={'inference_time': 'Inference Time (s)'}
     )
     # Add secondary line plot for model size
     fig_speed_size.add_scatter(
@@ -163,7 +162,7 @@ with comparison_col2:
         mode='lines+markers',
         name='Model Size (MB)',
         yaxis='y2',
-        marker=dict(color=SECONDARY_COLOR)
+        marker=dict(color=SECONDARY_COLOR, size=10)
     )
     fig_speed_size.update_layout(
         xaxis_title="Model Architecture",
@@ -262,18 +261,20 @@ st.plotly_chart(fig_scatter, use_container_width=True)
 
 st.markdown("""
 <style>
+    /* Styling to make the dashboard more attractive and eye-catching */
     .st-metric div {
         font-size: 1.2rem;
     }
     .st-metric > div > div:nth-child(2) {
         font-size: 2.5rem;
-        color: #e30b5d; /* Custom color for main value */
+        color: #e30b5d; /* Custom bold color for main value */
     }
-    /* Enhance the overall container look */
     .block-container {
         padding-top: 2rem;
         padding-bottom: 2rem;
     }
+    h1 {
+        color: #1f77b4; /* Deep blue for title */
+    }
 </style>
-
 """, unsafe_allow_html=True)
